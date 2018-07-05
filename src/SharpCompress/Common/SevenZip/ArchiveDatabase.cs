@@ -8,20 +8,20 @@ namespace SharpCompress.Common.SevenZip
 {
     internal class ArchiveDatabase
     {
-        internal byte _majorVersion;
-        internal byte _minorVersion;
-        internal long _startPositionAfterHeader;
-        internal long _dataStartPosition;
+        internal byte MajorVersion;
+        internal byte MinorVersion;
+        internal long StartPositionAfterHeader;
+        internal long DataStartPosition;
 
-        internal List<long> _packSizes = new List<long>();
-        internal List<uint?> _packCrCs = new List<uint?>();
-        internal List<CFolder> _folders = new List<CFolder>();
-        internal List<int> _numUnpackStreamsVector;
-        internal List<CFileItem> _files = new List<CFileItem>();
+        internal List<long> PackSizes = new List<long>();
+        internal List<uint?> PackCRCs = new List<uint?>();
+        internal List<CFolder> Folders = new List<CFolder>();
+        internal List<int> NumUnpackStreamsVector;
+        internal List<CFileItem> Files = new List<CFileItem>();
 
-        internal List<long> _packStreamStartPositions = new List<long>();
-        internal List<int> _folderStartFileIndex = new List<int>();
-        internal List<int> _fileIndexToFolderIndexMap = new List<int>();
+        internal List<long> PackStreamStartPositions = new List<long>();
+        internal List<int> FolderStartFileIndex = new List<int>();
+        internal List<int> FileIndexToFolderIndexMap = new List<int>();
         
         internal IPasswordProvider PasswordProvider { get; }
 
@@ -32,54 +32,54 @@ namespace SharpCompress.Common.SevenZip
 
         internal void Clear()
         {
-            _packSizes.Clear();
-            _packCrCs.Clear();
-            _folders.Clear();
-            _numUnpackStreamsVector = null;
-            _files.Clear();
+            PackSizes.Clear();
+            PackCRCs.Clear();
+            Folders.Clear();
+            NumUnpackStreamsVector = null;
+            Files.Clear();
 
-            _packStreamStartPositions.Clear();
-            _folderStartFileIndex.Clear();
-            _fileIndexToFolderIndexMap.Clear();
+            PackStreamStartPositions.Clear();
+            FolderStartFileIndex.Clear();
+            FileIndexToFolderIndexMap.Clear();
         }
 
         internal bool IsEmpty()
         {
-            return _packSizes.Count == 0
-                   && _packCrCs.Count == 0
-                   && _folders.Count == 0
-                   && _numUnpackStreamsVector.Count == 0
-                   && _files.Count == 0;
+            return PackSizes.Count == 0
+                   && PackCRCs.Count == 0
+                   && Folders.Count == 0
+                   && NumUnpackStreamsVector.Count == 0
+                   && Files.Count == 0;
         }
 
         private void FillStartPos()
         {
-            _packStreamStartPositions.Clear();
+            PackStreamStartPositions.Clear();
 
             long startPos = 0;
-            for (int i = 0; i < _packSizes.Count; i++)
+            for (int i = 0; i < PackSizes.Count; i++)
             {
-                _packStreamStartPositions.Add(startPos);
-                startPos += _packSizes[i];
+                PackStreamStartPositions.Add(startPos);
+                startPos += PackSizes[i];
             }
         }
 
         private void FillFolderStartFileIndex()
         {
-            _folderStartFileIndex.Clear();
-            _fileIndexToFolderIndexMap.Clear();
+            FolderStartFileIndex.Clear();
+            FileIndexToFolderIndexMap.Clear();
 
             int folderIndex = 0;
             int indexInFolder = 0;
-            for (int i = 0; i < _files.Count; i++)
+            for (int i = 0; i < Files.Count; i++)
             {
-                CFileItem file = _files[i];
+                CFileItem file = Files[i];
 
                 bool emptyStream = !file.HasStream;
 
                 if (emptyStream && indexInFolder == 0)
                 {
-                    _fileIndexToFolderIndexMap.Add(-1);
+                    FileIndexToFolderIndexMap.Add(-1);
                     continue;
                 }
 
@@ -89,14 +89,14 @@ namespace SharpCompress.Common.SevenZip
                     // v4.07: Loop for skipping empty folders
                     for (;;)
                     {
-                        if (folderIndex >= _folders.Count)
+                        if (folderIndex >= Folders.Count)
                         {
                             throw new InvalidOperationException();
                         }
 
-                        _folderStartFileIndex.Add(i); // check it
+                        FolderStartFileIndex.Add(i); // check it
 
-                        if (_numUnpackStreamsVector[folderIndex] != 0)
+                        if (NumUnpackStreamsVector[folderIndex] != 0)
                         {
                             break;
                         }
@@ -105,7 +105,7 @@ namespace SharpCompress.Common.SevenZip
                     }
                 }
 
-                _fileIndexToFolderIndexMap.Add(folderIndex);
+                FileIndexToFolderIndexMap.Add(folderIndex);
 
                 if (emptyStream)
                 {
@@ -114,7 +114,7 @@ namespace SharpCompress.Common.SevenZip
 
                 indexInFolder++;
 
-                if (indexInFolder >= _numUnpackStreamsVector[folderIndex])
+                if (indexInFolder >= NumUnpackStreamsVector[folderIndex])
                 {
                     folderIndex++;
                     indexInFolder = 0;
@@ -130,19 +130,19 @@ namespace SharpCompress.Common.SevenZip
 
         internal long GetFolderStreamPos(CFolder folder, int indexInFolder)
         {
-            int index = folder._firstPackStreamId + indexInFolder;
-            return _dataStartPosition + _packStreamStartPositions[index];
+            int index = folder.FirstPackStreamId + indexInFolder;
+            return DataStartPosition + PackStreamStartPositions[index];
         }
 
         internal long GetFolderFullPackSize(int folderIndex)
         {
-            int packStreamIndex = _folders[folderIndex]._firstPackStreamId;
-            CFolder folder = _folders[folderIndex];
+            int packStreamIndex = Folders[folderIndex].FirstPackStreamId;
+            CFolder folder = Folders[folderIndex];
 
             long size = 0;
-            for (int i = 0; i < folder._packStreams.Count; i++)
+            for (int i = 0; i < folder.PackStreams.Count; i++)
             {
-                size += _packSizes[packStreamIndex + i];
+                size += PackSizes[packStreamIndex + i];
             }
 
             return size;
@@ -150,12 +150,12 @@ namespace SharpCompress.Common.SevenZip
 
         internal Stream GetFolderStream(Stream stream, CFolder folder, IPasswordProvider pw)
         {
-            int packStreamIndex = folder._firstPackStreamId;
+            int packStreamIndex = folder.FirstPackStreamId;
             long folderStartPackPos = GetFolderStreamPos(folder, 0);
             List<long> packSizes = new List<long>();
-            for (int j = 0; j < folder._packStreams.Count; j++)
+            for (int j = 0; j < folder.PackStreams.Count; j++)
             {
-                packSizes.Add(_packSizes[packStreamIndex + j]);
+                packSizes.Add(PackSizes[packStreamIndex + j]);
             }
 
             return DecoderStreamHelper.CreateDecoderStream(stream, folderStartPackPos, packSizes.ToArray(), folder, pw);
@@ -163,15 +163,15 @@ namespace SharpCompress.Common.SevenZip
 
         private long GetFolderPackStreamSize(int folderIndex, int streamIndex)
         {
-            return _packSizes[_folders[folderIndex]._firstPackStreamId + streamIndex];
+            return PackSizes[Folders[folderIndex].FirstPackStreamId + streamIndex];
         }
 
         private long GetFilePackSize(int fileIndex)
         {
-            int folderIndex = _fileIndexToFolderIndexMap[fileIndex];
+            int folderIndex = FileIndexToFolderIndexMap[fileIndex];
             if (folderIndex != -1)
             {
-                if (_folderStartFileIndex[folderIndex] == fileIndex)
+                if (FolderStartFileIndex[folderIndex] == fileIndex)
                 {
                     return GetFolderFullPackSize(folderIndex);
                 }
